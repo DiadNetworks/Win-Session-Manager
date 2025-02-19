@@ -313,6 +313,7 @@ $messageMenuItem.Add_Click({
         $msgTextBox.Location = New-Object System.Drawing.Point(10,40)
         $msgTextBox.Size = New-Object System.Drawing.Size(360,80)
         $msgTextBox.Multiline = $true
+        $msgTextBox.Icon = ".\Images\logo.ico"
         $msgForm.Controls.Add($msgTextBox)
        
         $sendButton = New-Object System.Windows.Forms.Button
