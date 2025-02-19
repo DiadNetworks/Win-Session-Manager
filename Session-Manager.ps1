@@ -339,13 +339,14 @@ $messageMenuItem.Add_Click({
            
             foreach ($item in $listView.SelectedItems) {
                 $server = $item.SubItems[1].Text
+                $username = $item.SubItems[0].Text
                 try {
                     $fullMessage = "Message from IT Support:`n`n$message"
-                    msg * /server:$server $fullMessage
+                    msg $username /server:$server $fullMessage
                 }
                 catch {
                     [System.Windows.Forms.MessageBox]::Show(
-                        "Error sending message to $server : $_",
+                        "Error sending message to $username on $server : $_",
                         "Error",
                         [System.Windows.Forms.MessageBoxButtons]::OK,
                         [System.Windows.Forms.MessageBoxIcon]::Error)
