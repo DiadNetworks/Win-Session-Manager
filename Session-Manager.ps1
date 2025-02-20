@@ -8,6 +8,8 @@ $form.Text = "Remote Session Manager"
 $form.Size = New-Object System.Drawing.Size(800,600)
 $form.StartPosition = "CenterScreen"
 $form.Icon = ".\Images\logo.ico"
+$form.maximizeBox = $false
+$form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedSingle
 
 # Create server input label
 $labelServers = New-Object System.Windows.Forms.Label
