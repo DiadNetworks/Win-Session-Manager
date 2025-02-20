@@ -148,14 +148,14 @@ function Update-SessionList {
         $servers = $textBoxServers.Text -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
     }
     else {
-        # Try to read from C:\servers.txt
-        $serverFilePath = "C:\servers.txt"
+        # Try to read from .\servers.txt
+        $serverFilePath = ".\servers.txt"
         if (Test-Path $serverFilePath) {
             $servers = Get-Content $serverFilePath | Where-Object { $_.Trim() } | ForEach-Object { $_.Trim() }
         }
         else {
             [System.Windows.Forms.MessageBox]::Show(
-                "No servers specified and couldn't find C:\servers.txt",
+                "No servers specified and couldn't find .\servers.txt",
                 "Warning",
                 [System.Windows.Forms.MessageBoxButtons]::OK,
                 [System.Windows.Forms.MessageBoxIcon]::Warning)
