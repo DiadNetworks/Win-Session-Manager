@@ -304,6 +304,7 @@ $messageMenuItem.Add_Click({
         $msgForm.Text = "Send Message"
         $msgForm.Size = New-Object System.Drawing.Size(400,200)
         $msgForm.StartPosition = "CenterScreen"
+        $msgForm.icon = ".\Images\message.ico"
        
         $msgLabel = New-Object System.Windows.Forms.Label
         $msgLabel.Location = New-Object System.Drawing.Point(10,20)
