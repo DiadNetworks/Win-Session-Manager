@@ -44,6 +44,10 @@ $buttonRefresh.Size = New-Object System.Drawing.Size(75,20)
 $buttonRefresh.Text = "Refresh"
 $form.Controls.Add($buttonRefresh)
 
+# Global variables to keep track of the current sort column and order
+$global:SortColumn = "Username"
+$global:SortOrder = "Ascending"
+
 # Create ListView
 $listView = New-Object System.Windows.Forms.ListView
 $listView.Location = New-Object System.Drawing.Point(10,70)
@@ -54,41 +58,30 @@ $listView.GridLines = $true
 
 # Add columns
 $listView.Columns.Add("Username", 150)
+$listView.Columns.Add("Display Name", 150)
 $listView.Columns.Add("Server", 150)
 $listView.Columns.Add("Session ID", 100)
 $listView.Columns.Add("State", 100)
 $listView.Columns.Add("C: Space Free", 120)
 $form.Controls.Add($listView)
 
-# Create context menu
-$contextMenu = New-Object System.Windows.Forms.ContextMenuStrip
-$shadowMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
-$shadowMenuItem.Text = "Shadow Session"
-$contextMenu.Items.Add($shadowMenuItem)
-
-$logoffMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
-$logoffMenuItem.Text = "Log Off Session(s)"
-$contextMenu.Items.Add($logoffMenuItem)
-
-$messageMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
-$messageMenuItem.Text = "Send Message"
-$contextMenu.Items.Add($messageMenuItem)
-
-$listView.ContextMenuStrip = $contextMenu
-
-# Function to get disk space
-function Get-RemoteDiskSpace {
+# Function to get display name from Active Directory
+function Get-DisplayName {
     param (
-        [string]$Server
+        [string]$Username
     )
-   
     try {
-        $drive = Get-WmiObject -Class Win32_LogicalDisk -ComputerName $Server -Filter "DeviceID='C:'" -ErrorAction Stop
-        $freeSpace = [math]::Round($drive.FreeSpace / 1GB, 2)
-        return "$freeSpace GB"
+        $searcher = [adsisearcher]"(samaccountname=$Username)"
+        $result = $searcher.FindOne()
+        if ($result) {
+            return $result.Properties['displayname'][0]
+        }
+        else {
+            return $Username
+        }
     }
     catch {
-        return "Error"
+        return $Username
     }
 }
 
@@ -100,7 +93,7 @@ function Get-RemoteSessions {
    
     $sessions = @()
     $diskSpace = @{}
-   
+
     foreach ($server in $ServerList) {
         # Get disk space once per server
         $diskSpace[$server] = Get-RemoteDiskSpace -Server $server
@@ -118,9 +111,11 @@ function Get-RemoteSessions {
                     $sessionId = $line | Where-Object { $_ -match '^\d+$' } | Select-Object -First 1
                     $username = $line[0]
                     $state = $line | Where-Object { $_ -match 'Active|Disc' } | Select-Object -First 1
+                    $displayName = Get-DisplayName -Username $username
                    
                     $sessions += [PSCustomObject]@{
                         Username = $username
+                        DisplayName = $displayName
                         Server = $server
                         SessionID = $sessionId
                         State = $state
@@ -134,7 +129,7 @@ function Get-RemoteSessions {
         }
     }
    
-    return $sessions | Sort-Object Username
+    return $sessions
 }
 
 # Function to update ListView
@@ -172,20 +167,76 @@ function Update-SessionList {
             $searchText = $SearchText.ToLower()
             $sessions = $sessions | Where-Object {
                 $_.Username.ToLower().Contains($searchText) -or
+                $_.DisplayName.ToLower().Contains($searchText) -or
                 $_.Server.ToLower().Contains($searchText) -or
                 $_.SessionID.ToString().Contains($searchText) -or
                 $_.State.ToLower().Contains($searchText)
             }
         }
+
+        # Sort sessions based on the current sort column and order
+        if ($global:SortOrder -eq "Ascending") {
+            $sessions = $sessions | Sort-Object -Property $global:SortColumn
+        }
+        else {
+            $sessions = $sessions | Sort-Object -Property $global:SortColumn -Descending
+        }
        
         foreach ($session in $sessions) {
             $item = New-Object System.Windows.Forms.ListViewItem($session.Username)
+            $item.SubItems.Add($session.DisplayName)
             $item.SubItems.Add($session.Server)
             $item.SubItems.Add($session.SessionID)
             $item.SubItems.Add($session.State)
             $item.SubItems.Add($session.DiskSpace)
             $listView.Items.Add($item)
         }
+    }
+}
+
+# Handle the ColumnClick event to sort the ListView
+$listView.add_ColumnClick({
+    param($sender, $e)
+    $columns = @("Username", "DisplayName", "Server", "SessionID", "State", "DiskSpace")
+    $global:SortColumn = $columns[$e.Column]
+    if ($global:SortOrder -eq "Ascending") {
+        $global:SortOrder = "Descending"
+    }
+    else {
+        $global:SortOrder = "Ascending"
+    }
+    Update-SessionList -SearchText $textBoxSearch.Text
+})
+
+# Create context menu
+$contextMenu = New-Object System.Windows.Forms.ContextMenuStrip
+$shadowMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$shadowMenuItem.Text = "Shadow Session"
+$contextMenu.Items.Add($shadowMenuItem)
+
+$logoffMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$logoffMenuItem.Text = "Log Off Session(s)"
+$contextMenu.Items.Add($logoffMenuItem)
+
+$messageMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$messageMenuItem.Text = "Send Message"
+$contextMenu.Items.Add($messageMenuItem)
+
+$listView.ContextMenuStrip = $contextMenu
+
+# Function to get disk space
+function Get-RemoteDiskSpace {
+    param (
+        [string]$Server
+    )
+   
+    try {
+        $drive = Get-WmiObject -Class Win32_LogicalDisk -ComputerName $Server -Filter "DeviceID='C:'" -ErrorAction Stop
+        $freeSpace = [math]::Round($drive.FreeSpace / 1GB, 2)
+        return "$freeSpace GB"
+    }
+    catch {
+        return "Error"
     }
 }
 
