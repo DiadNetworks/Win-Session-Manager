@@ -274,8 +274,8 @@ $textBoxSearch.Add_TextChanged({
 
 $shadowMenuItem.Add_Click({
     if ($listView.SelectedItems.Count -eq 1) {
-        $server = $listView.SelectedItems[0].SubItems[1].Text
-        $sessionId = $listView.SelectedItems[0].SubItems[2].Text
+        $server = $listView.SelectedItems[0].SubItems[2].Text
+        $sessionId = $listView.SelectedItems[0].SubItems[3].Text
         $username = $listView.SelectedItems[0].SubItems[0].Text
        
         # Create shadow options form
@@ -338,8 +338,8 @@ $logoffMenuItem.Add_Click({
         foreach ($item in $listView.SelectedItems) {
             $selectedSessions += [PSCustomObject]@{
                 Username = $item.Text
-                Server = $item.SubItems[1].Text
-                SessionID = $item.SubItems[2].Text
+                Server = $item.SubItems[2].Text
+                SessionID = $item.SubItems[3].Text
             }
         }
        
@@ -417,7 +417,7 @@ $messageMenuItem.Add_Click({
             $message = $msgTextBox.Text.Trim()
            
             foreach ($item in $listView.SelectedItems) {
-                $server = $item.SubItems[1].Text
+                $server = $item.SubItems[2].Text
                 $username = $item.SubItems[0].Text
                 try {
                     $fullMessage = "Message from IT Support:`n`n$message"
