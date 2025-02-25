@@ -47,6 +47,7 @@ $form.Controls.Add($buttonRefresh)
 # Global variables to keep track of the current sort column and order
 $global:SortColumn = "Username"
 $global:SortOrder = "Ascending"
+$global:CachedSessions = @()
 
 # Create ListView
 $listView = New-Object System.Windows.Forms.ListView
@@ -55,6 +56,7 @@ $listView.Size = New-Object System.Drawing.Size(765,480)
 $listView.View = [System.Windows.Forms.View]::Details
 $listView.FullRowSelect = $true
 $listView.GridLines = $true
+$listView.Scrollable = $true
 
 # Add columns
 $listView.Columns.Add("Username", 150)
@@ -64,6 +66,11 @@ $listView.Columns.Add("Session ID", 100)
 $listView.Columns.Add("State", 100)
 $listView.Columns.Add("C: Space Free", 120)
 $form.Controls.Add($listView)
+
+# Enable mouse wheel scrolling
+$listView.add_MouseEnter({
+    $listView.Focus()
+})
 
 # Function to get display name from Active Directory
 function Get-DisplayName {
@@ -135,62 +142,68 @@ function Get-RemoteSessions {
 # Function to update ListView
 function Update-SessionList {
     param (
-        [string]$SearchText = ""
+        [string]$SearchText = "",
+        [bool]$Refresh = $false
     )
    
-    $listView.Items.Clear()
-   
-    # Get servers from textbox or file
-    if ($textBoxServers.Text.Trim()) {
-        $servers = $textBoxServers.Text -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-    }
-    else {
-        # Try to read from .\servers.txt
-        $serverFilePath = ".\servers.txt"
-        if (Test-Path $serverFilePath) {
-            $servers = Get-Content $serverFilePath | Where-Object { $_.Trim() } | ForEach-Object { $_.Trim() }
+    if ($Refresh) {
+        $listView.Items.Clear()
+       
+        # Get servers from textbox or file
+        if ($textBoxServers.Text.Trim()) {
+            $servers = $textBoxServers.Text -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
         }
         else {
-            [System.Windows.Forms.MessageBox]::Show(
-                "No servers specified and couldn't find .\servers.txt",
-                "Warning",
-                [System.Windows.Forms.MessageBoxButtons]::OK,
-                [System.Windows.Forms.MessageBoxIcon]::Warning)
-            $servers = @()
-        }
-    }
-   
-    if ($servers) {
-        $sessions = Get-RemoteSessions -ServerList $servers
-       
-        if ($SearchText) {
-            $searchText = $SearchText.ToLower()
-            $sessions = $sessions | Where-Object {
-                $_.Username.ToLower().Contains($searchText) -or
-                $_.DisplayName.ToLower().Contains($searchText) -or
-                $_.Server.ToLower().Contains($searchText) -or
-                $_.SessionID.ToString().Contains($searchText) -or
-                $_.State.ToLower().Contains($searchText)
+            # Try to read from .\servers.txt
+            $serverFilePath = ".\servers.txt"
+            if (Test-Path $serverFilePath) {
+                $servers = Get-Content $serverFilePath | Where-Object { $_.Trim() } | ForEach-Object { $_.Trim() }
+            }
+            else {
+                [System.Windows.Forms.MessageBox]::Show(
+                    "No servers specified and couldn't find .\servers.txt",
+                    "Warning",
+                    [System.Windows.Forms.MessageBoxButtons]::OK,
+                    [System.Windows.Forms.MessageBoxIcon]::Warning)
+                $servers = @()
             }
         }
-
-        # Sort sessions based on the current sort column and order
-        if ($global:SortOrder -eq "Ascending") {
-            $sessions = $sessions | Sort-Object -Property $global:SortColumn
-        }
-        else {
-            $sessions = $sessions | Sort-Object -Property $global:SortColumn -Descending
-        }
        
-        foreach ($session in $sessions) {
-            $item = New-Object System.Windows.Forms.ListViewItem($session.Username)
-            $item.SubItems.Add($session.DisplayName)
-            $item.SubItems.Add($session.Server)
-            $item.SubItems.Add($session.SessionID)
-            $item.SubItems.Add($session.State)
-            $item.SubItems.Add($session.DiskSpace)
-            $listView.Items.Add($item)
+        if ($servers) {
+            $global:CachedSessions = Get-RemoteSessions -ServerList $servers
         }
+    }
+   
+    $sessions = $global:CachedSessions
+   
+    if ($SearchText) {
+        $searchText = $SearchText.ToLower()
+        $sessions = $sessions | Where-Object {
+            $_.Username.ToLower().Contains($searchText) -or
+            $_.DisplayName.ToLower().Contains($searchText) -or
+            $_.Server.ToLower().Contains($searchText) -or
+            $_.SessionID.ToString().Contains($searchText) -or
+            $_.State.ToLower().Contains($searchText)
+        }
+    }
+
+    # Sort sessions based on the current sort column and order
+    if ($global:SortOrder -eq "Ascending") {
+        $sessions = $sessions | Sort-Object -Property $global:SortColumn
+    }
+    else {
+        $sessions = $sessions | Sort-Object -Property $global:SortColumn -Descending
+    }
+   
+    $listView.Items.Clear()
+    foreach ($session in $sessions) {
+        $item = New-Object System.Windows.Forms.ListViewItem($session.Username)
+        $item.SubItems.Add($session.DisplayName)
+        $item.SubItems.Add($session.Server)
+        $item.SubItems.Add($session.SessionID)
+        $item.SubItems.Add($session.State)
+        $item.SubItems.Add($session.DiskSpace)
+        $listView.Items.Add($item)
     }
 }
 
@@ -242,7 +255,7 @@ function Get-RemoteDiskSpace {
 
 # Event handlers
 $buttonRefresh.Add_Click({
-    Update-SessionList -SearchText $textBoxSearch.Text
+    Update-SessionList -SearchText $textBoxSearch.Text -Refresh $true
 })
 
 $textBoxSearch.Add_TextChanged({
