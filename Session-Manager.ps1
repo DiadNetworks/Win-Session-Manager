@@ -100,10 +100,12 @@ function Get-RemoteSessions {
    
     $sessions = @()
     $diskSpace = @{}
+    $userCounts = @{}
 
     foreach ($server in $ServerList) {
         # Get disk space once per server
         $diskSpace[$server] = Get-RemoteDiskSpace -Server $server
+        $userCounts[$server] = 0
        
         try {
             $query = quser /server:$server 2>&1
@@ -128,6 +130,7 @@ function Get-RemoteSessions {
                         State = $state
                         DiskSpace = $diskSpace[$server]
                     }
+                    $userCounts[$server]++
                 }
             }
         }
@@ -136,7 +139,10 @@ function Get-RemoteSessions {
         }
     }
    
-    return $sessions
+    return [PSCustomObject]@{
+        Sessions = $sessions
+        UserCounts = $userCounts
+    }
 }
 
 # Function to update ListView
@@ -170,7 +176,9 @@ function Update-SessionList {
         }
        
         if ($servers) {
-            $global:CachedSessions = Get-RemoteSessions -ServerList $servers
+            $result = Get-RemoteSessions -ServerList $servers
+            $global:CachedSessions = $result.Sessions
+            $global:UserCounts = $result.UserCounts
         }
     }
    
@@ -197,9 +205,10 @@ function Update-SessionList {
    
     $listView.Items.Clear()
     foreach ($session in $sessions) {
+        $serverWithCount = "$($session.Server) ($($global:UserCounts[$session.Server]))"
         $item = New-Object System.Windows.Forms.ListViewItem($session.Username)
         $item.SubItems.Add($session.DisplayName)
-        $item.SubItems.Add($session.Server)
+        $item.SubItems.Add($serverWithCount)
         $item.SubItems.Add($session.SessionID)
         $item.SubItems.Add($session.State)
         $item.SubItems.Add($session.DiskSpace)
