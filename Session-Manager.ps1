@@ -209,6 +209,7 @@ $shadowMenuItem.Add_Click({
         $optionsForm.Text = "Shadow Options"
         $optionsForm.Size = New-Object System.Drawing.Size(300,200)
         $optionsForm.StartPosition = "CenterScreen"
+        $optionsForm.icon = ".\Images\shadow.ico"
        
         $consentCheck = New-Object System.Windows.Forms.CheckBox
         $consentCheck.Location = New-Object System.Drawing.Point(10,20)
