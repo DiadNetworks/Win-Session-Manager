@@ -65,6 +65,7 @@ $listView.Columns.Add("Server", 150)
 $listView.Columns.Add("Session ID", 100)
 $listView.Columns.Add("State", 100)
 $listView.Columns.Add("C: Space Free", 120)
+$listView.Columns.Add("Sessions Open", 120)
 $form.Controls.Add($listView)
 
 # Enable mouse wheel scrolling
@@ -205,13 +206,13 @@ function Update-SessionList {
    
     $listView.Items.Clear()
     foreach ($session in $sessions) {
-        $serverWithCount = "$($session.Server) ($($global:UserCounts[$session.Server]))"
         $item = New-Object System.Windows.Forms.ListViewItem($session.Username)
         $item.SubItems.Add($session.DisplayName)
-        $item.SubItems.Add($serverWithCount)
+        $item.SubItems.Add($session.Server)
         $item.SubItems.Add($session.SessionID)
         $item.SubItems.Add($session.State)
         $item.SubItems.Add($session.DiskSpace)
+        $item.SubItems.Add($global:UserCounts[$session.Server])
         $listView.Items.Add($item)
     }
 }
@@ -219,7 +220,7 @@ function Update-SessionList {
 # Handle the ColumnClick event to sort the ListView
 $listView.add_ColumnClick({
     param($sender, $e)
-    $columns = @("Username", "DisplayName", "Server", "SessionID", "State", "DiskSpace")
+    $columns = @("Username", "DisplayName", "Server", "SessionID", "State", "DiskSpace", "UserCounts")
     $global:SortColumn = $columns[$e.Column]
     if ($global:SortOrder -eq "Ascending") {
         $global:SortOrder = "Descending"
