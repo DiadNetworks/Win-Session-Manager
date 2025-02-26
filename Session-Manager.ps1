@@ -351,6 +351,10 @@ function Show-SettingsForm {
     $settingsForm.Size = New-Object System.Drawing.Size(300,200)
     $settingsForm.StartPosition = "CenterScreen"
     $settingsForm.icon = ".\Images\settings.ico"
+    $settingsForm.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+    $settingsForm.maximizeBox = $false
+    $settingsForm.minimizeBox = $false
+    $settingsForm.TopMost = $true
 
     $checkBoxRefreshOnStartup = New-Object System.Windows.Forms.CheckBox
     $checkBoxRefreshOnStartup.Location = New-Object System.Drawing.Point(10,20)
@@ -423,6 +427,10 @@ $shadowMenuItem.Add_Click({
         $optionsForm.Size = New-Object System.Drawing.Size(300,200)
         $optionsForm.StartPosition = "CenterScreen"
         $optionsForm.icon = ".\Images\shadow.ico"
+        $optionsForm.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+        $optionsForm.maximizeBox = $false
+        $optionsForm.minimizeBox = $false
+        $optionsForm.TopMost = $true
 
         $consentCheck = New-Object System.Windows.Forms.CheckBox
         $consentCheck.Location = New-Object System.Drawing.Point(10,20)
@@ -521,6 +529,10 @@ $messageMenuItem.Add_Click({
         $msgForm.Size = New-Object System.Drawing.Size(400,200)
         $msgForm.StartPosition = "CenterScreen"
         $msgForm.icon = ".\Images\message.ico"
+        $msgForm.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+        $msgForm.maximizeBox = $false
+        $msgForm.minimizeBox = $false
+        $msgForm.TopMost = $true
        
         $msgLabel = New-Object System.Windows.Forms.Label
         $msgLabel.Location = New-Object System.Drawing.Point(10,20)
@@ -532,7 +544,6 @@ $messageMenuItem.Add_Click({
         $msgTextBox.Location = New-Object System.Drawing.Point(10,40)
         $msgTextBox.Size = New-Object System.Drawing.Size(360,80)
         $msgTextBox.Multiline = $true
-        $msgTextBox.Icon = ".\Images\logo.ico"
         $msgForm.Controls.Add($msgTextBox)
        
         $sendButton = New-Object System.Windows.Forms.Button
