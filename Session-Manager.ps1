@@ -44,6 +44,14 @@ $buttonRefresh.Size = New-Object System.Drawing.Size(75,20)
 $buttonRefresh.Text = "Refresh"
 $form.Controls.Add($buttonRefresh)
 
+# Create settings button
+$buttonSettings = New-Object System.Windows.Forms.Button
+$buttonSettings.Location = New-Object System.Drawing.Point(750,10)
+$buttonSettings.Size = New-Object System.Drawing.Size(24,24)
+$buttonSettings.Image = [System.Drawing.Image]::FromFile(".\Images\settings.ico")
+$buttonSettings.ImageAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+$form.Controls.Add($buttonSettings)
+
 # Global variables to keep track of the current sort column and order
 $global:SortColumn = "Username"
 $global:SortOrder = "Ascending"
@@ -263,6 +271,78 @@ function Get-RemoteDiskSpace {
     }
 }
 
+# Function to read settings from ini file
+function Read-Settings {
+    $settings = @{
+        RefreshOnStartup = 0
+    }
+    if (Test-Path ".\settings.ini") {
+        $ini = Get-Content ".\settings.ini" | Out-String
+        $ini -split "`r`n" | ForEach-Object {
+            if ($_ -match "RefreshOnStartup=(\d)") {
+                $settings.RefreshOnStartup = [int]$matches[1]
+            }
+        }
+    }
+    return $settings
+}
+
+# Function to write settings to ini file
+function Write-Settings {
+    param (
+        [hashtable]$settings
+    )
+    $content = "[Settings]`nRefreshOnStartup=$($settings.RefreshOnStartup)"
+    Set-Content ".\settings.ini" -Value $content
+}
+
+# Function to create settings form
+function Show-SettingsForm {
+    $settings = Read-Settings
+
+    $settingsForm = New-Object System.Windows.Forms.Form
+    $settingsForm.Text = "Settings"
+    $settingsForm.Size = New-Object System.Drawing.Size(300,150)
+    $settingsForm.StartPosition = "CenterScreen"
+    $settingsForm.icon = ".\Images\settings.ico"
+
+    $checkBoxRefreshOnStartup = New-Object System.Windows.Forms.CheckBox
+    $checkBoxRefreshOnStartup.Location = New-Object System.Drawing.Point(10,20)
+    $checkBoxRefreshOnStartup.Size = New-Object System.Drawing.Size(260,20)
+    $checkBoxRefreshOnStartup.Text = "Refresh on startup"
+    $checkBoxRefreshOnStartup.Checked = [bool]$settings.RefreshOnStartup
+    $settingsForm.Controls.Add($checkBoxRefreshOnStartup)
+
+    $okButton = New-Object System.Windows.Forms.Button
+    $okButton.Location = New-Object System.Drawing.Point(100,70)
+    $okButton.Size = New-Object System.Drawing.Size(75,23)
+    $okButton.Text = "OK"
+    $okButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $settingsForm.Controls.Add($okButton)
+
+    $cancelButton = New-Object System.Windows.Forms.Button
+    $cancelButton.Location = New-Object System.Drawing.Point(190,70)
+    $cancelButton.Size = New-Object System.Drawing.Size(75,23)
+    $cancelButton.Text = "Cancel"
+    $cancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+    $settingsForm.Controls.Add($cancelButton)
+
+    $settingsForm.AcceptButton = $okButton
+    $settingsForm.CancelButton = $cancelButton
+
+    $result = $settingsForm.ShowDialog()
+
+    if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+        $settings.RefreshOnStartup = [int]$checkBoxRefreshOnStartup.Checked
+        Write-Settings -settings $settings
+    }
+}
+
+# Event handler for settings button click
+$buttonSettings.Add_Click({
+    Show-SettingsForm
+})
+
 # Event handlers
 $buttonRefresh.Add_Click({
     Update-SessionList -SearchText $textBoxSearch.Text -Refresh $true
@@ -434,6 +514,14 @@ $messageMenuItem.Add_Click({
         }
     }
 })
+
+# Read settings on startup
+$settings = Read-Settings
+
+# Check RefreshOnStartup setting
+if ($settings.RefreshOnStartup -eq 1) {
+    Update-SessionList -SearchText $textBoxSearch.Text -Refresh $true
+}
 
 # Show the form
 $form.Add_Shown({$form.Activate()})
