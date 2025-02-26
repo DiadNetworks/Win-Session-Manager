@@ -101,17 +101,53 @@ function Get-DisplayName {
     }
 }
 
+# Function to show progress form
+function Show-ProgressForm {
+    $progressForm = New-Object System.Windows.Forms.Form
+    $progressForm.Text = "Loading..."
+    $progressForm.Size = New-Object System.Drawing.Size(300,100)
+    $progressForm.StartPosition = "CenterScreen"
+    $progressForm.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+    $progressForm.ControlBox = $false
+    $progressForm.TopMost = $true
+
+    $progressBar = New-Object System.Windows.Forms.ProgressBar
+    $progressBar.Style = [System.Windows.Forms.ProgressBarStyle]::Continuous
+    $progressBar.Dock = [System.Windows.Forms.DockStyle]::Top
+    $progressForm.Controls.Add($progressBar)
+
+    $progressLabel = New-Object System.Windows.Forms.Label
+    $progressLabel.Dock = [System.Windows.Forms.DockStyle]::Bottom
+    $progressLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+    $progressForm.Controls.Add($progressLabel)
+
+    $progressForm.Shown.Add({
+        $progressForm.Activate()
+    })
+
+    return $progressForm, $progressBar, $progressLabel
+}
+
 # Function to get sessions
 function Get-RemoteSessions {
     param (
-        [string[]]$ServerList
+        [string[]]$ServerList,
+        [System.Windows.Forms.ProgressBar]$ProgressBar,
+        [System.Windows.Forms.Label]$ProgressLabel
     )
    
     $sessions = @()
     $diskSpace = @{}
     $userCounts = @{}
+    $totalServers = $ServerList.Count
+    $currentServer = 0
 
     foreach ($server in $ServerList) {
+        $currentServer++
+        $ProgressBar.Value = [math]::Round(($currentServer / $totalServers) * 100)
+        $ProgressLabel.Text = "Querying server: $server"
+        [System.Windows.Forms.Application]::DoEvents()
+
         # Get disk space once per server
         $diskSpace[$server] = Get-RemoteDiskSpace -Server $server
         $userCounts[$server] = 0
@@ -158,7 +194,9 @@ function Get-RemoteSessions {
 function Update-SessionList {
     param (
         [string]$SearchText = "",
-        [bool]$Refresh = $false
+        [bool]$Refresh = $false,
+        [System.Windows.Forms.ProgressBar]$ProgressBar = $null,
+        [System.Windows.Forms.Label]$ProgressLabel = $null
     )
    
     if ($Refresh) {
@@ -185,7 +223,7 @@ function Update-SessionList {
         }
        
         if ($servers) {
-            $result = Get-RemoteSessions -ServerList $servers
+            $result = Get-RemoteSessions -ServerList $servers -ProgressBar $ProgressBar -ProgressLabel $ProgressLabel
             $global:CachedSessions = $result.Sessions
             $global:UserCounts = $result.UserCounts
         }
@@ -345,7 +383,10 @@ $buttonSettings.Add_Click({
 
 # Event handlers
 $buttonRefresh.Add_Click({
-    Update-SessionList -SearchText $textBoxSearch.Text -Refresh $true
+    $progressForm, $progressBar, $progressLabel = Show-ProgressForm
+    $progressForm.Show()
+    Update-SessionList -SearchText $textBoxSearch.Text -Refresh $true -ProgressBar $progressBar -ProgressLabel $progressLabel
+    $progressForm.Close()
 })
 
 $textBoxSearch.Add_TextChanged({
@@ -520,7 +561,10 @@ $settings = Read-Settings
 
 # Check RefreshOnStartup setting
 if ($settings.RefreshOnStartup -eq 1) {
-    Update-SessionList -SearchText $textBoxSearch.Text -Refresh $true
+    $progressForm, $progressBar, $progressLabel = Show-ProgressForm
+    $progressForm.Show()
+    Update-SessionList -SearchText $textBoxSearch.Text -Refresh $true -ProgressBar $progressBar -ProgressLabel $progressLabel
+    $progressForm.Close()
 }
 
 # Show the form
