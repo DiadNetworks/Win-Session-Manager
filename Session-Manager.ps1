@@ -39,8 +39,8 @@ $form.Controls.Add($textBoxSearch)
 
 # Create refresh button
 $buttonRefresh = New-Object System.Windows.Forms.Button
-$buttonRefresh.Location = New-Object System.Drawing.Point(630,40)
-$buttonRefresh.Size = New-Object System.Drawing.Size(75,20)
+$buttonRefresh.Location = New-Object System.Drawing.Point(700,38)
+$buttonRefresh.Size = New-Object System.Drawing.Size(75,24)
 $buttonRefresh.Text = "Refresh"
 $form.Controls.Add($buttonRefresh)
 
@@ -121,7 +121,7 @@ function Show-ProgressForm {
     $progressLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
     $progressForm.Controls.Add($progressLabel)
 
-    $progressForm.Shown.Add({
+    $progressForm.Add_Shown({
         $progressForm.Activate()
     })
 
@@ -132,8 +132,8 @@ function Show-ProgressForm {
 function Get-RemoteSessions {
     param (
         [string[]]$ServerList,
-        [System.Windows.Forms.ProgressBar]$ProgressBar,
-        [System.Windows.Forms.Label]$ProgressLabel
+        [System.Windows.Forms.ProgressBar]$ProgressBar = $null,
+        [System.Windows.Forms.Label]$ProgressLabel = $null
     )
    
     $sessions = @()
@@ -144,8 +144,12 @@ function Get-RemoteSessions {
 
     foreach ($server in $ServerList) {
         $currentServer++
-        $ProgressBar.Value = [math]::Round(($currentServer / $totalServers) * 100)
-        $ProgressLabel.Text = "Querying server: $server"
+        if ($ProgressBar -ne $null) {
+            $ProgressBar.Value = [math]::Round(($currentServer / $totalServers) * 100)
+        }
+        if ($ProgressLabel -ne $null) {
+            $ProgressLabel.Text = "Querying server: $server"
+        }
         [System.Windows.Forms.Application]::DoEvents()
 
         # Get disk space once per server
@@ -313,12 +317,16 @@ function Get-RemoteDiskSpace {
 function Read-Settings {
     $settings = @{
         RefreshOnStartup = 0
+        DefaultShadowOptions = 0
     }
     if (Test-Path ".\settings.ini") {
         $ini = Get-Content ".\settings.ini" | Out-String
         $ini -split "`r`n" | ForEach-Object {
             if ($_ -match "RefreshOnStartup=(\d)") {
                 $settings.RefreshOnStartup = [int]$matches[1]
+            }
+            elseif ($_ -match "DefaultShadowOptions=(\d)") {
+                $settings.DefaultShadowOptions = [int]$matches[1]
             }
         }
     }
@@ -330,7 +338,7 @@ function Write-Settings {
     param (
         [hashtable]$settings
     )
-    $content = "[Settings]`nRefreshOnStartup=$($settings.RefreshOnStartup)"
+    $content = "[Settings]`nRefreshOnStartup=$($settings.RefreshOnStartup)`nDefaultShadowOptions=$($settings.DefaultShadowOptions)"
     Set-Content ".\settings.ini" -Value $content
 }
 
@@ -340,7 +348,7 @@ function Show-SettingsForm {
 
     $settingsForm = New-Object System.Windows.Forms.Form
     $settingsForm.Text = "Settings"
-    $settingsForm.Size = New-Object System.Drawing.Size(300,150)
+    $settingsForm.Size = New-Object System.Drawing.Size(300,200)
     $settingsForm.StartPosition = "CenterScreen"
     $settingsForm.icon = ".\Images\settings.ico"
 
@@ -351,15 +359,22 @@ function Show-SettingsForm {
     $checkBoxRefreshOnStartup.Checked = [bool]$settings.RefreshOnStartup
     $settingsForm.Controls.Add($checkBoxRefreshOnStartup)
 
+    $checkBoxDefaultShadowOptions = New-Object System.Windows.Forms.CheckBox
+    $checkBoxDefaultShadowOptions.Location = New-Object System.Drawing.Point(10,50)
+    $checkBoxDefaultShadowOptions.Size = New-Object System.Drawing.Size(260,20)
+    $checkBoxDefaultShadowOptions.Text = "Default shadow options"
+    $checkBoxDefaultShadowOptions.Checked = [bool]$settings.DefaultShadowOptions
+    $settingsForm.Controls.Add($checkBoxDefaultShadowOptions)
+
     $okButton = New-Object System.Windows.Forms.Button
-    $okButton.Location = New-Object System.Drawing.Point(100,70)
+    $okButton.Location = New-Object System.Drawing.Point(100,100)
     $okButton.Size = New-Object System.Drawing.Size(75,23)
     $okButton.Text = "OK"
     $okButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
     $settingsForm.Controls.Add($okButton)
 
     $cancelButton = New-Object System.Windows.Forms.Button
-    $cancelButton.Location = New-Object System.Drawing.Point(190,70)
+    $cancelButton.Location = New-Object System.Drawing.Point(190,100)
     $cancelButton.Size = New-Object System.Drawing.Size(75,23)
     $cancelButton.Text = "Cancel"
     $cancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
@@ -372,6 +387,7 @@ function Show-SettingsForm {
 
     if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
         $settings.RefreshOnStartup = [int]$checkBoxRefreshOnStartup.Checked
+        $settings.DefaultShadowOptions = [int]$checkBoxDefaultShadowOptions.Checked
         Write-Settings -settings $settings
     }
 }
@@ -398,56 +414,60 @@ $shadowMenuItem.Add_Click({
         $server = $listView.SelectedItems[0].SubItems[2].Text
         $sessionId = $listView.SelectedItems[0].SubItems[3].Text
         $username = $listView.SelectedItems[0].SubItems[0].Text
-       
+
+        $settings = Read-Settings
+
         # Create shadow options form
         $optionsForm = New-Object System.Windows.Forms.Form
         $optionsForm.Text = "Shadow Options"
         $optionsForm.Size = New-Object System.Drawing.Size(300,200)
         $optionsForm.StartPosition = "CenterScreen"
         $optionsForm.icon = ".\Images\shadow.ico"
-       
+
         $consentCheck = New-Object System.Windows.Forms.CheckBox
         $consentCheck.Location = New-Object System.Drawing.Point(10,20)
         $consentCheck.Size = New-Object System.Drawing.Size(260,20)
         $consentCheck.Text = "No consent prompt"
+        $consentCheck.Checked = [bool]$settings.DefaultShadowOptions
         $optionsForm.Controls.Add($consentCheck)
-       
+
         $controlCheck = New-Object System.Windows.Forms.CheckBox
         $controlCheck.Location = New-Object System.Drawing.Point(10,50)
         $controlCheck.Size = New-Object System.Drawing.Size(260,20)
         $controlCheck.Text = "Enable control (unchecked = view only)"
+        $controlCheck.Checked = [bool]$settings.DefaultShadowOptions
         $optionsForm.Controls.Add($controlCheck)
-       
+
         $okButton = New-Object System.Windows.Forms.Button
         $okButton.Location = New-Object System.Drawing.Point(100,120)
         $okButton.Size = New-Object System.Drawing.Size(75,23)
         $okButton.Text = "Connect"
         $okButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
         $optionsForm.Controls.Add($okButton)
-       
+
         $cancelButton = New-Object System.Windows.Forms.Button
         $cancelButton.Location = New-Object System.Drawing.Point(190,120)
         $cancelButton.Size = New-Object System.Drawing.Size(75,23)
         $cancelButton.Text = "Cancel"
         $cancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
         $optionsForm.Controls.Add($cancelButton)
-       
+
         $optionsForm.AcceptButton = $okButton
         $optionsForm.CancelButton = $cancelButton
-       
+
         $result = $optionsForm.ShowDialog()
-       
+
         if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
             $shadowArgs = "/v:$server /shadow:$sessionId"
-           
+
             if ($controlCheck.Checked) {
                 $shadowArgs += " /control"
             }
-           
+
             if ($consentCheck.Checked) {
                 $shadowArgs += " /noconsentprompt"
             }
-           
+
             Start-Process "mstsc.exe" -ArgumentList $shadowArgs
         }
     }
@@ -566,6 +586,17 @@ if ($settings.RefreshOnStartup -eq 1) {
     Update-SessionList -SearchText $textBoxSearch.Text -Refresh $true -ProgressBar $progressBar -ProgressLabel $progressLabel
     $progressForm.Close()
 }
+
+# Event handler for form key down
+$form.add_KeyDown({
+    param($sender, $e)
+    if ($e.KeyCode -eq [System.Windows.Forms.Keys]::Enter) {
+        $buttonRefresh.PerformClick()
+    }
+})
+
+# Ensure the form can capture key events
+$form.KeyPreview = $true
 
 # Show the form
 $form.Add_Shown({$form.Activate()})
