@@ -59,13 +59,13 @@ $listView.GridLines = $true
 $listView.Scrollable = $true
 
 # Add columns
-$listView.Columns.Add("Username", 150)
-$listView.Columns.Add("Display Name", 150)
-$listView.Columns.Add("Server", 150)
+$listView.Columns.Add("Username", 120)
+$listView.Columns.Add("Display Name", 130)
+$listView.Columns.Add("Server", 130)
 $listView.Columns.Add("Session ID", 100)
-$listView.Columns.Add("State", 100)
-$listView.Columns.Add("C: Space Free", 120)
-$listView.Columns.Add("Sessions Open", 120)
+$listView.Columns.Add("State", 90)
+$listView.Columns.Add("C: Space Free", 100)
+$listView.Columns.Add("Sessions Open", 90)
 $form.Controls.Add($listView)
 
 # Enable mouse wheel scrolling
