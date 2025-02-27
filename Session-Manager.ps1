@@ -348,7 +348,7 @@ function Show-SettingsForm {
 
     $settingsForm = New-Object System.Windows.Forms.Form
     $settingsForm.Text = "Settings"
-    $settingsForm.Size = New-Object System.Drawing.Size(300,200)
+    $settingsForm.Size = New-Object System.Drawing.Size(280,160)
     $settingsForm.StartPosition = "CenterScreen"
     $settingsForm.icon = ".\Images\settings.ico"
     $settingsForm.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
@@ -371,14 +371,14 @@ function Show-SettingsForm {
     $settingsForm.Controls.Add($checkBoxDefaultShadowOptions)
 
     $okButton = New-Object System.Windows.Forms.Button
-    $okButton.Location = New-Object System.Drawing.Point(100,100)
+    $okButton.Location = New-Object System.Drawing.Point(50,90)
     $okButton.Size = New-Object System.Drawing.Size(75,23)
     $okButton.Text = "OK"
     $okButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
     $settingsForm.Controls.Add($okButton)
 
     $cancelButton = New-Object System.Windows.Forms.Button
-    $cancelButton.Location = New-Object System.Drawing.Point(190,100)
+    $cancelButton.Location = New-Object System.Drawing.Point(150,90)
     $cancelButton.Size = New-Object System.Drawing.Size(75,23)
     $cancelButton.Text = "Cancel"
     $cancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
