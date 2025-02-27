@@ -424,7 +424,7 @@ $shadowMenuItem.Add_Click({
         # Create shadow options form
         $optionsForm = New-Object System.Windows.Forms.Form
         $optionsForm.Text = "Shadow Options"
-        $optionsForm.Size = New-Object System.Drawing.Size(300,200)
+        $optionsForm.Size = New-Object System.Drawing.Size(280,160)
         $optionsForm.StartPosition = "CenterScreen"
         $optionsForm.icon = ".\Images\shadow.ico"
         $optionsForm.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
@@ -447,14 +447,14 @@ $shadowMenuItem.Add_Click({
         $optionsForm.Controls.Add($controlCheck)
 
         $okButton = New-Object System.Windows.Forms.Button
-        $okButton.Location = New-Object System.Drawing.Point(100,120)
+        $okButton.Location = New-Object System.Drawing.Point(50,90)
         $okButton.Size = New-Object System.Drawing.Size(75,23)
         $okButton.Text = "Connect"
         $okButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
         $optionsForm.Controls.Add($okButton)
 
         $cancelButton = New-Object System.Windows.Forms.Button
-        $cancelButton.Location = New-Object System.Drawing.Point(190,120)
+        $cancelButton.Location = New-Object System.Drawing.Point(150,90)
         $cancelButton.Size = New-Object System.Drawing.Size(75,23)
         $cancelButton.Text = "Cancel"
         $cancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
