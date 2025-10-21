@@ -661,14 +661,6 @@ $messageMenuItem.Add_Click({
 # Read settings on startup
 $settings = Read-Settings
 
-# Check RefreshOnStartup setting
-if ($settings.RefreshOnStartup -eq 1) {
-    $progressForm, $progressBar, $progressLabel = Show-ProgressForm
-    $progressForm.Show()
-    Update-SessionList -SearchText $textBoxSearch.Text -Refresh $true -ProgressBar $progressBar -ProgressLabel $progressLabel
-    $progressForm.Close()
-}
-
 # Event handler for form key down
 $form.add_KeyDown({
     param($sender, $e)
@@ -680,8 +672,21 @@ $form.add_KeyDown({
 # Ensure the form can capture key events
 $form.KeyPreview = $true
 
-# Show the form
-$form.Add_Shown({$form.Activate()})
+# Handle Shown event
+$form.Add_Shown({
+    $form.Activate()
+
+    if ($settings.RefreshOnStartup -eq 1) {
+        # Run refresh logic after the form is fully displayed
+        $null = $form.BeginInvoke([System.Action]{
+            $progressForm, $progressBar, $progressLabel = Show-ProgressForm
+            $progressForm.Show()
+            Update-SessionList -SearchText $textBoxSearch.Text -Refresh $true -ProgressBar $progressBar -ProgressLabel $progressLabel
+            $progressForm.Close()
+        })
+    }
+})
+
 $form.ShowDialog()
 
 # Release the form
