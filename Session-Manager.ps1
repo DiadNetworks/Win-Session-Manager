@@ -4,7 +4,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Create the main form
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "Remote Session Manager"
+$form.Text = "Remote Session Manager v1.3"
 $form.Size = New-Object System.Drawing.Size(800,600)
 $form.StartPosition = "CenterScreen"
 $form.Icon = ".\Images\logo.ico"
