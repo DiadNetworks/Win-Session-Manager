@@ -81,22 +81,79 @@ $listView.add_MouseEnter({
     $listView.Focus()
 })
 
-# Function to get display name from Active Directory
+# Function to read the display name cache
+function Read-DisplayNameCache {
+    $cacheFilePath = ".\scriptcache"
+    if (Test-Path $cacheFilePath) {
+        try {
+            $cache = @{}
+            Import-Csv -Path $cacheFilePath -Delimiter ',' -ErrorAction Stop | ForEach-Object {
+                if (-not [string]::IsNullOrWhiteSpace($_.Username) -and -not [string]::IsNullOrWhiteSpace($_.DisplayName)) {
+                    $cache[$_.Username] = $_.DisplayName
+                }
+            }
+            return $cache
+        }
+        catch {
+            Write-Warning "Failed to read cache file: $_"
+        }
+    }
+    return @{}
+}
+
+# Function to write the display name cache
+function Write-DisplayNameCache {
+    param (
+        [hashtable]$Cache
+    )
+    $cacheFilePath = ".\scriptcache"
+    try {
+        $Cache.GetEnumerator() | Where-Object { -not [string]::IsNullOrWhiteSpace($_.Value) } | ForEach-Object {
+            [PSCustomObject]@{
+                Username = $_.Key
+                DisplayName = [string]$_.Value # Ensure DisplayName is written as a string
+            }
+        } | Export-Csv -Path $cacheFilePath -NoTypeInformation -Delimiter ',' -Force
+    }
+    catch {
+        Write-Warning "Failed to write cache file $_"
+    }
+}
+
+# Update the Get-DisplayName function to use the cache
 function Get-DisplayName {
     param (
-        [string]$Username
+        [string]$Username,
+        [hashtable]$Cache
     )
+    if ($Cache.ContainsKey($Username)) {
+        return [string]$Cache[$Username] # Ensure the cached value is returned as a string
+    }
     try {
         $searcher = [adsisearcher]"(samaccountname=$Username)"
         $result = $searcher.FindOne()
         if ($result) {
-            return $result.Properties['displayname'][0]
+            # Extract the first value of the displayname property as a string
+            $displayName = $result.Properties['displayname']
+            if ($displayName -is [System.Collections.IEnumerable]) {
+                $displayName = $displayName | Select-Object -First 1
+            }
+            $displayName = [string]$displayName
+            if (-not [string]::IsNullOrWhiteSpace($displayName)) {
+                $Cache[$Username] = $displayName
+            }
+            else {
+                $Cache[$Username] = $Username # Fallback to username if display name is blank
+            }
+            return $Cache[$Username]
         }
         else {
+            $Cache[$Username] = $Username
             return $Username
         }
     }
     catch {
+        $Cache[$Username] = $Username
         return $Username
     }
 }
@@ -142,6 +199,9 @@ function Get-RemoteSessions {
     $totalServers = $ServerList.Count
     $currentServer = 0
 
+    # Read the display name cache
+    $cache = Read-DisplayNameCache
+
     foreach ($server in $ServerList) {
         $currentServer++
         if ($ProgressBar -ne $null) {
@@ -169,8 +229,16 @@ function Get-RemoteSessions {
                     $sessionId = $line | Where-Object { $_ -match '^\d+$' } | Select-Object -First 1
                     $username = $line[0]
                     $state = $line | Where-Object { $_ -match 'Active|Disc' } | Select-Object -First 1
-                    $displayName = Get-DisplayName -Username $username
-                   
+
+                    # Check cache for display name
+                    if (-not $cache.ContainsKey($username)) {
+                        $displayName = Get-DisplayName -Username $username -Cache $cache
+                        $cache[$username] = $displayName
+                    }
+                    else {
+                        $displayName = $cache[$username]
+                    }
+
                     $sessions += [PSCustomObject]@{
                         Username = $username
                         DisplayName = $displayName
@@ -187,7 +255,10 @@ function Get-RemoteSessions {
             Write-Warning "Error querying $server : $_"
         }
     }
-   
+
+    # Write updated cache back to file
+    Write-DisplayNameCache -Cache $cache
+
     return [PSCustomObject]@{
         Sessions = $sessions
         UserCounts = $userCounts
@@ -202,7 +273,7 @@ function Update-SessionList {
         [System.Windows.Forms.ProgressBar]$ProgressBar = $null,
         [System.Windows.Forms.Label]$ProgressLabel = $null
     )
-   
+
     if ($Refresh) {
         $listView.Items.Clear()
        
@@ -257,7 +328,7 @@ function Update-SessionList {
     $listView.Items.Clear()
     foreach ($session in $sessions) {
         $item = New-Object System.Windows.Forms.ListViewItem($session.Username)
-        $item.SubItems.Add($session.DisplayName)
+        $item.SubItems.Add([string]$session.DisplayName) # Ensure DisplayName is added as a string
         $item.SubItems.Add($session.Server)
         $item.SubItems.Add($session.SessionID)
         $item.SubItems.Add($session.State)
