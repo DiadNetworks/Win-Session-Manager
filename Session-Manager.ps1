@@ -136,55 +136,106 @@ function Get-RemoteSessions {
         [System.Windows.Forms.Label]$ProgressLabel = $null
     )
    
+    $settings = Read-Settings
     $sessions = @()
     $diskSpace = @{}
     $userCounts = @{}
     $totalServers = $ServerList.Count
     $currentServer = 0
 
-    foreach ($server in $ServerList) {
-        $currentServer++
-        if ($ProgressBar -ne $null) {
-            $ProgressBar.Value = [math]::Round(($currentServer / $totalServers) * 100)
-        }
-        if ($ProgressLabel -ne $null) {
-            $ProgressLabel.Text = "Querying server: $server"
-        }
-        [System.Windows.Forms.Application]::DoEvents()
+    if ($settings.UseMultithreading -eq 1) {
+        $jobs = @()
+        foreach ($server in $ServerList) {
+            $jobs += Start-Job -ScriptBlock {
+                param($server)
+                $result = @{}
+                try {
+                    $diskSpace = Get-WmiObject -Class Win32_LogicalDisk -ComputerName $server -Filter "DeviceID='C:'" -ErrorAction Stop
+                    $result.DiskSpace = [math]::Round($diskSpace.FreeSpace / 1GB, 2)
+                }
+                catch {
+                    $result.DiskSpace = "Error"
+                }
 
-        # Get disk space once per server
-        $diskSpace[$server] = Get-RemoteDiskSpace -Server $server
-        $userCounts[$server] = 0
-       
-        try {
-            $query = quser /server:$server 2>&1
-            if ($query -match "ERROR") {
-                Write-Warning "Failed to query $server : $query"
-                continue
-            }
-           
-            $query | Select-Object -Skip 1 | ForEach-Object {
-                $line = $_.Trim() -replace '\s+', ' ' -split '\s'
-                if ($line.Count -ge 3) {
-                    $sessionId = $line | Where-Object { $_ -match '^\d+$' } | Select-Object -First 1
-                    $username = $line[0]
-                    $state = $line | Where-Object { $_ -match 'Active|Disc' } | Select-Object -First 1
-                    $displayName = Get-DisplayName -Username $username
-                   
-                    $sessions += [PSCustomObject]@{
-                        Username = $username
-                        DisplayName = $displayName
-                        Server = $server
-                        SessionID = $sessionId
-                        State = $state
-                        DiskSpace = $diskSpace[$server]
+                try {
+                    $query = quser /server:$server 2>&1
+                    if ($query -notmatch "ERROR") {
+                        $sessions = @()
+                        $query | Select-Object -Skip 1 | ForEach-Object {
+                            $line = $_.Trim() -replace '\s+', ' ' -split '\s'
+                            if ($line.Count -ge 3) {
+                                $sessionId = $line | Where-Object { $_ -match '^\d+$' } | Select-Object -First 1
+                                $username = $line[0]
+                                $state = $line | Where-Object { $_ -match 'Active|Disc' } | Select-Object -First 1
+                                $sessions += [PSCustomObject]@{
+                                    Username = $username
+                                    Server = $server
+                                    SessionID = $sessionId
+                                    State = $state
+                                }
+                            }
+                        }
+                        $result.Sessions = $sessions
                     }
-                    $userCounts[$server]++
+                }
+                catch {
+                    $result.Sessions = @()
+                }
+                return $result
+            } -ArgumentList $server
+        }
+
+        # Wait for jobs to complete and collect results
+        $jobs | Wait-Job
+        foreach ($job in $jobs) {
+            $output = Receive-Job -Job $job
+            $diskSpace[$output.Server] = $output.DiskSpace
+            $sessions += $output.Sessions
+            Remove-Job -Job $job
+        }
+    }
+    else {
+        foreach ($server in $ServerList) {
+            $currentServer++
+            if ($ProgressBar -ne $null) {
+                $ProgressBar.Value = [math]::Round(($currentServer / $totalServers) * 100)
+            }
+            if ($ProgressLabel -ne $null) {
+                $ProgressLabel.Text = "Querying server: $server"
+            }
+            [System.Windows.Forms.Application]::DoEvents()
+
+            # Get disk space once per server
+            $diskSpace[$server] = Get-RemoteDiskSpace -Server $server
+            $userCounts[$server] = 0
+           
+            try {
+                $query = quser /server:$server 2>&1
+                if ($query -match "ERROR") {
+                    Write-Warning "Failed to query $server : $query"
+                    continue
+                }
+               
+                $query | Select-Object -Skip 1 | ForEach-Object {
+                    $line = $_.Trim() -replace '\s+', ' ' -split '\s'
+                    if ($line.Count -ge 3) {
+                        $sessionId = $line | Where-Object { $_ -match '^\d+$' } | Select-Object -First 1
+                        $username = $line[0]
+                        $state = $line | Where-Object { $_ -match 'Active|Disc' } | Select-Object -First 1
+                        $sessions += [PSCustomObject]@{
+                            Username = $username
+                            Server = $server
+                            SessionID = $sessionId
+                            State = $state
+                            DiskSpace = $diskSpace[$server]
+                        }
+                        $userCounts[$server]++
+                    }
                 }
             }
-        }
-        catch {
-            Write-Warning "Error querying $server : $_"
+            catch {
+                Write-Warning "Error querying $server : $_"
+            }
         }
     }
    
@@ -318,6 +369,7 @@ function Read-Settings {
     $settings = @{
         RefreshOnStartup = 0
         DefaultShadowOptions = 0
+        UseMultithreading = 0
     }
     if (Test-Path ".\settings.ini") {
         $ini = Get-Content ".\settings.ini" | Out-String
@@ -327,6 +379,9 @@ function Read-Settings {
             }
             elseif ($_ -match "DefaultShadowOptions=(\d)") {
                 $settings.DefaultShadowOptions = [int]$matches[1]
+            }
+            elseif ($_ -match "UseMultithreading=(\d)") {
+                $settings.UseMultithreading = [int]$matches[1]
             }
         }
     }
@@ -338,7 +393,7 @@ function Write-Settings {
     param (
         [hashtable]$settings
     )
-    $content = "[Settings]`nRefreshOnStartup=$($settings.RefreshOnStartup)`nDefaultShadowOptions=$($settings.DefaultShadowOptions)"
+    $content = "[Settings]`nRefreshOnStartup=$($settings.RefreshOnStartup)`nDefaultShadowOptions=$($settings.DefaultShadowOptions)`nUseMultithreading=$($settings.UseMultithreading)"
     Set-Content ".\settings.ini" -Value $content
 }
 
@@ -348,7 +403,7 @@ function Show-SettingsForm {
 
     $settingsForm = New-Object System.Windows.Forms.Form
     $settingsForm.Text = "Settings"
-    $settingsForm.Size = New-Object System.Drawing.Size(280,160)
+    $settingsForm.Size = New-Object System.Drawing.Size(280,200)
     $settingsForm.StartPosition = "CenterScreen"
     $settingsForm.icon = ".\Images\settings.ico"
     $settingsForm.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
@@ -370,15 +425,22 @@ function Show-SettingsForm {
     $checkBoxDefaultShadowOptions.Checked = [bool]$settings.DefaultShadowOptions
     $settingsForm.Controls.Add($checkBoxDefaultShadowOptions)
 
+    $checkBoxUseMultithreading = New-Object System.Windows.Forms.CheckBox
+    $checkBoxUseMultithreading.Location = New-Object System.Drawing.Point(10,80)
+    $checkBoxUseMultithreading.Size = New-Object System.Drawing.Size(260,20)
+    $checkBoxUseMultithreading.Text = "Use multithreading for server scans"
+    $checkBoxUseMultithreading.Checked = [bool]$settings.UseMultithreading
+    $settingsForm.Controls.Add($checkBoxUseMultithreading)
+
     $okButton = New-Object System.Windows.Forms.Button
-    $okButton.Location = New-Object System.Drawing.Point(50,90)
+    $okButton.Location = New-Object System.Drawing.Point(50,120)
     $okButton.Size = New-Object System.Drawing.Size(75,23)
     $okButton.Text = "OK"
     $okButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
     $settingsForm.Controls.Add($okButton)
 
     $cancelButton = New-Object System.Windows.Forms.Button
-    $cancelButton.Location = New-Object System.Drawing.Point(150,90)
+    $cancelButton.Location = New-Object System.Drawing.Point(150,120)
     $cancelButton.Size = New-Object System.Drawing.Size(75,23)
     $cancelButton.Text = "Cancel"
     $cancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
@@ -392,6 +454,7 @@ function Show-SettingsForm {
     if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
         $settings.RefreshOnStartup = [int]$checkBoxRefreshOnStartup.Checked
         $settings.DefaultShadowOptions = [int]$checkBoxDefaultShadowOptions.Checked
+        $settings.UseMultithreading = [int]$checkBoxUseMultithreading.Checked
         Write-Settings -settings $settings
     }
 }
